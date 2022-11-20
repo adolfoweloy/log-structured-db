@@ -3,22 +3,27 @@ package com.adolfoeloy.hashindex;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
 public class LogDatabase implements KeyValueStore<Long, String> {
-    private final RandomAccessFile randomAccessFile;
+    private final Segment segment;
+
+    /**
+     * This requires that all keys can be kept in memory, which means that
+     * this kind of store engine is well suited to cases where a given key is updated frequently
+     * instead of having new ones created often.
+     */
     private final Map<Long, Long> hashIndex = new HashMap<>();
 
-    public LogDatabase(RandomAccessFile randomAccessFile) {
-        this.randomAccessFile = randomAccessFile;
+    public LogDatabase(Segment segment) {
+        this.segment = segment;
     }
 
     public static KeyValueStore<Long, String> createDB() {
         try {
-            return new LogDatabase(new RandomAccessFile("database", "rw"));
+            return new LogDatabase(new Segment(new RandomAccessFile("database", "rw")));
         } catch (FileNotFoundException e) {
             throw new LogDatabaseException(e);
         }
@@ -27,9 +32,7 @@ public class LogDatabase implements KeyValueStore<Long, String> {
     @Override
     public void set(Long key, String value) {
         try {
-            long currentPointer = randomAccessFile.getFilePointer();
-            randomAccessFile.writeUTF(value);
-            hashIndex.put(key, currentPointer);
+            hashIndex.put(key, segment.write(new Segment.Row(key.toString(), value)));
         } catch (IOException e) {
             throw new LogDatabaseException(e);
         }
@@ -39,23 +42,12 @@ public class LogDatabase implements KeyValueStore<Long, String> {
     public Optional<String> get(Long key) {
         Long offset = hashIndex.get(key);
 
-        if (offset != null) {
-            try {
-                randomAccessFile.seek(offset);
+        if (offset == null) return Optional.empty();
 
-                int length = randomAccessFile.readShort();
-                byte[] contentValueBuffer = new byte[(length)];
-
-                randomAccessFile.read(contentValueBuffer);
-                return Optional.of(
-                        new String(contentValueBuffer,
-                        StandardCharsets.UTF_8
-                ));
-            } catch (IOException e) {
-                throw new LogDatabaseException(e);
-            }
+        try {
+            return Optional.of(segment.read(offset).value());
+        } catch (IOException e) {
+            throw new LogDatabaseException(e);
         }
-
-        return Optional.empty();
     }
 }

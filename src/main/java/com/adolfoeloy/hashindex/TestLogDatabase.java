@@ -10,6 +10,5 @@ public class TestLogDatabase {
 
         System.out.println(db.get(1L));
         System.out.println(db.get(3L));
-
     }
 }
