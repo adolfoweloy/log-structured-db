@@ -14,6 +14,8 @@ public class LogDatabase implements KeyValueStore<Long, String> {
      * This requires that all keys can be kept in memory, which means that
      * this kind of store engine is well suited to cases where a given key is updated frequently
      * instead of having new ones created often.
+     *
+     * TODO: Each segment has its own hash-index. So it is sensible to move the hashIndex closer to the Segment.
      */
     private final Map<Long, Long> hashIndex = new HashMap<>();
 
